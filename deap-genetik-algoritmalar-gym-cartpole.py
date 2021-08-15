@@ -113,8 +113,14 @@ toolbox.register("select", tools.selTournament, tournsize=selectionTournamentSiz
 
 # Popülasyonu oluştur
 population = toolbox.population(n=n_population)
-stats = tools.Statistics(lambda ind: ind.fitness.values[0])
 hallOfFame = tools.HallOfFame(1)
+
+# Fitness statistics
+stats = tools.Statistics(lambda ind: ind.fitness.values[0])
+stats.register("avg", np.mean, axis=0)
+stats.register("std", np.std, axis=0)
+stats.register("min", np.min, axis=0)
+stats.register("max", np.max, axis=0)
 
 ## GA simülasyonu öncesi rastgele bir bireyle ortamı çalıştır
 run_env(

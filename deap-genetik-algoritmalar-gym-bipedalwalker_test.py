@@ -40,7 +40,7 @@ def run_env(act_fn, n_episode=1, render=False):
 
 ## Yapay sinir ağı
 # Ara katman ünite sayısı
-nn_hidden_unit = 8
+nn_hidden_unit = 12
 w1_ndim = (observation_space_dim*nn_hidden_unit)
 w2_ndim = (nn_hidden_unit*action_space_dim)
 w3_ndim = (nn_hidden_unit*action_space_dim)
@@ -79,7 +79,7 @@ def nn_forward(individual, state):
 
 	# Normal dağılım için Mu & Sigma çıktıları
 	mu_output = tanh(np.dot(h1, w_mu) + b_mu)
-	sigma_output = relu(np.dot(h1, w_sigma) + b_sigma)
+	sigma_output = softplus(np.dot(h1, w_sigma) + b_sigma)
 
 	# Normal dağılımdan sample alarak aksiyonu döndür
 	output = np.random.normal(loc=mu_output[0], scale=sigma_output[0])

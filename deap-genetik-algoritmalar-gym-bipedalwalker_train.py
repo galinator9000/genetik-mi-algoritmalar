@@ -37,7 +37,7 @@ def run_env(act_fn, n_episode=1, render=False):
 
 ## Yapay sinir ağı
 # Ara katman ünite sayısı
-nn_hidden_unit = 8
+nn_hidden_unit = 12
 w1_ndim = (observation_space_dim*nn_hidden_unit)
 w2_ndim = (nn_hidden_unit*action_space_dim)
 w3_ndim = (nn_hidden_unit*action_space_dim)
@@ -76,7 +76,7 @@ def nn_forward(individual, state):
 
 	# Normal dağılım için Mu & Sigma çıktıları
 	mu_output = tanh(np.dot(h1, w_mu) + b_mu)
-	sigma_output = relu(np.dot(h1, w_sigma) + b_sigma)
+	sigma_output = softplus(np.dot(h1, w_sigma) + b_sigma)
 
 	# Normal dağılımdan sample alarak aksiyonu döndür
 	output = np.random.normal(loc=mu_output[0], scale=sigma_output[0])
@@ -87,10 +87,10 @@ def nn_forward(individual, state):
 n_features = (w1_ndim + w2_ndim + w3_ndim + 3)
 
 # Simüle edilecek nesil sayısı
-n_generation = 1
+n_generation = 2500
 
 # Popülasyon boyutu (birey sayısı)
-n_population = 32
+n_population = 24
 
 # Seleksiyon turnuvasındaki birey sayısı
 selectionTournamentSize = 3
@@ -130,18 +130,14 @@ toolbox.register("select", tools.selTournament, tournsize=selectionTournamentSiz
 
 # Popülasyonu oluştur
 population = toolbox.population(n=n_population)
-stats = tools.Statistics(lambda ind: ind.fitness.values[0])
 hallOfFame = tools.HallOfFame(1)
 
-## GA simülasyonu öncesi rastgele bir bireyle ortamı çalıştır
-run_env(
-	act_fn=(lambda state: nn_forward(
-		random.choice(population),
-		state
-	)),
-	n_episode=5,
-	render=True
-)
+# Fitness statistics
+stats = tools.Statistics(lambda ind: ind.fitness.values[0])
+stats.register("avg", np.mean, axis=0)
+stats.register("std", np.std, axis=0)
+stats.register("min", np.min, axis=0)
+stats.register("max", np.max, axis=0)
 
 # Simülasyon başlasın!
 finalPopulation, logs = algorithms.eaSimple(
