@@ -1,4 +1,5 @@
-import random
+import random, gym
+import numpy as np
 from deap import algorithms, base, creator, tools
 
 ## Hiperparametreler
@@ -42,6 +43,7 @@ toolbox.register("select", tools.selTournament, tournsize=selectionTournamentSiz
 
 # Popülasyonu oluştur
 population = toolbox.population(n=n_population)
+stats = tools.Statistics(lambda ind: ind.fitness.values[0])
 hallOfFame = tools.HallOfFame(1)
 
 # Simülasyon başlasın!
@@ -49,6 +51,7 @@ finalPopulation, logs = algorithms.eaSimple(
 	population=population,
 	toolbox=toolbox,
 	halloffame=hallOfFame,
+	stats=stats,
 	ngen=n_generation,
 	cxpb=crossingoverProbability,
 	mutpb=mutationProbability,
