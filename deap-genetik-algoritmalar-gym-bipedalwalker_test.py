@@ -5,7 +5,7 @@ from deap import algorithms, base, creator, tools
 modelInPath = "models/bipedalWalkerBest"
 
 # Kaydedilen modeli yükle
-best = np.load(modelInPath if modelInPath.endswith(".npy") else (modelInPath+".npy"))
+bestIndividual = np.load(modelInPath if modelInPath.endswith(".npy") else (modelInPath+".npy"))
 
 ## Simülasyon ortamı
 env = gym.make("BipedalWalker-v3")
@@ -87,7 +87,7 @@ def nn_forward(individual, state):
 
 # En iyi bireyle simülasyonu çalıştır
 run_env(
-	act_fn=(lambda state: nn_forward(best, state)),
+	act_fn=(lambda state: nn_forward(bestIndividual, state)),
 	n_episode=10,
 	render=True
 )

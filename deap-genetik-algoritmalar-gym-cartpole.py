@@ -115,7 +115,7 @@ toolbox.register("select", tools.selTournament, tournsize=selectionTournamentSiz
 population = toolbox.population(n=n_population)
 hallOfFame = tools.HallOfFame(1)
 
-# Fitness statistics
+# Fitness istatistiği
 stats = tools.Statistics(lambda ind: ind.fitness.values[0])
 stats.register("avg", np.mean, axis=0)
 stats.register("std", np.std, axis=0)
@@ -144,13 +144,13 @@ finalPopulation, logs = algorithms.eaSimple(
 	verbose=True
 )
 
-best = hallOfFame[0]
-print("[+] En iyi uygunluk değeri: {}".format(best.fitness.values[0]))
-print("Genotip: ", best)
+bestIndividual = hallOfFame[0]
+print("[+] En iyi uygunluk değeri: {}".format(bestIndividual.fitness.values[0]))
+print("Genotip: ", bestIndividual)
 
 # En iyi bireyle simülasyonu çalıştır
 run_env(
-	act_fn=(lambda state: nn_forward(best, state)),
+	act_fn=(lambda state: nn_forward(bestIndividual, state)),
 	n_episode=5,
 	render=True
 )
