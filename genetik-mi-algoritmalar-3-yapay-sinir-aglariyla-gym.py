@@ -8,13 +8,13 @@ observation_space_dim = env.observation_space.shape[0]
 action_space_dim = env.action_space.n
 
 # Tekrarlanabilirlik için seed ayarlanır
-SEED_VALUE = 64
+SEED_VALUE = 32
 random.seed(SEED_VALUE)
 np.random.seed(SEED_VALUE)
 env.seed(SEED_VALUE)
 
 # Simülasyonu çalıştırmak için ortak fonksiyon
-def run_env(act_fn, n_episode=1, render=False):
+def run_env(act_fn, n_episode=1, render=False, timestep=None):
 	# Episode döngüsü
 	totalRewards = 0
 	for episode in range(n_episode):
@@ -22,15 +22,26 @@ def run_env(act_fn, n_episode=1, render=False):
 		done = False
 
 		# Timestep döngüsü
-		while not done:
-			if render: env.render()
+		if timestep != None:
+			for _ in range(timestep):
+				if render: env.render()
 
-			# act_fn adlı fonksiyon parametreyi çağırarak aksiyonu al
-			action = act_fn(state)
-			next_state, reward, done, info = env.step(action)
+				# act_fn adlı fonksiyon parametreyi çağırarak aksiyonu al
+				action = act_fn(state)
+				next_state, reward, done, info = env.step(action)
 
-			totalRewards += reward
-			state = next_state
+				totalRewards += reward
+				state = next_state
+		else:
+			while not done:
+				if render: env.render()
+
+				# act_fn adlı fonksiyon parametreyi çağırarak aksiyonu al
+				action = act_fn(state)
+				next_state, reward, done, info = env.step(action)
+
+				totalRewards += reward
+				state = next_state
 	return totalRewards
 
 ## Yapay sinir ağı
@@ -78,8 +89,7 @@ n_population = 32
 # Seleksiyon turnuvasındaki birey sayısı
 selectionTournamentSize = 3
 
-# Çaprazlama ve mutasyon olasılıkları
-crossingoverProbability = 0.50
+# Mutasyon olasılıkları
 mutationProbability = 0.10
 
 # Uygunluk ve Birey sınıflarını oluştur
@@ -129,7 +139,8 @@ run_env(
 		state
 	)),
 	n_episode=10,
-	render=True
+	render=True,
+	timestep=90
 )
 
 # Simülasyon başlasın!
@@ -139,7 +150,7 @@ finalPopulation, logs = algorithms.eaSimple(
 	halloffame=hallOfFame,
 	stats=stats,
 	ngen=n_generation,
-	cxpb=crossingoverProbability,
+	cxpb=0.5,
 	mutpb=mutationProbability,
 	verbose=True
 )
