@@ -104,7 +104,8 @@ for ind in initialPopulation:
 			)
 		),
 		n_episode=1,
-		render=True
+		render=True,
+		n_timestep=40
 	)
 
 # Evrimsel simülasyon başlasın!

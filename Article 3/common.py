@@ -71,17 +71,26 @@ class NeuralNetwork:
 		return np.argmax(hidden_output)
 
 ## Verilen gym ortamını, verilen aksiyon fonksiyonuyla çalıştırmak için ortak bir fonksiyon
-def run_gym_environment(env, act_fn, n_episode=1, render=False):
+def run_gym_environment(env, act_fn, n_episode=1, render=False, n_timestep=None):
 	totalRewards = 0
 
 	# Episode döngüsü
 	for episode in range(n_episode):
+		timestep = 0
 		state = env.reset()
 		done = False
 
+		def shouldStop():
+			# Eğer timestep değeri verilmişse sadece onu dikkate al
+			if (n_timestep != None):
+				return (timestep >= n_timestep)
+			# Verilmemişse ortamın sağladığı tamamlanma değerini kullan
+			else:
+				return done
+
 		# Timestep döngüsü
 		episodeReward = 0
-		while not done:
+		while not shouldStop():
 			if render: env.render()
 
 			# Aksiyon kararı ver
@@ -90,6 +99,7 @@ def run_gym_environment(env, act_fn, n_episode=1, render=False):
 			# Ortamda uygula
 			state, reward, done, _ = env.step(action)
 			episodeReward += reward
+			timestep += 1
 
 		if render: print("Episode bitti, ödül {}".format(episodeReward))
 		totalRewards += episodeReward
