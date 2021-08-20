@@ -1,7 +1,7 @@
 import random, gym
 import numpy as np
 from deap import algorithms, base, creator, tools
-from GenetikMiAlgoritmalar import NeuralNetwork, run_gym_environment
+from common import NeuralNetwork, run_gym_environment
 
 # Simülasyon ortamımızı oluşturalım
 env = gym.make("CartPole-v1")
