@@ -132,7 +132,7 @@ initialPopulation = toolbox.initializePopulation(n=n_population)
 # Simülasyon boyunca en uygun bireyin kaydını tutacak objemiz
 hallOfFame = tools.HallOfFame(1)
 
-# Fitness istatistiklerini tutacak objemiz
+# Uygunluk istatistiklerini tutacak objemiz
 stats = tools.Statistics(lambda ind: ind.fitness.values[0])
 stats.register("min", np.min)
 stats.register("max", np.max)
