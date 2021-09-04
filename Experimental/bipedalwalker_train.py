@@ -1,25 +1,30 @@
-import random, gym, pickle
+import random, gym, pickle, concurrent.futures
 import numpy as np
 from deap import algorithms, base, creator, tools
 
 modelOutPath = "models/bipedalWalkerBest"
 loadPopulation = True
 initialPopulationInPath = "models/initialPopulation.pickle"
+allGenerationsFinalPopulationOutPath = "models/allGenerationsFinalPopulation.pickle"
 finalPopulationOutPath = "models/finalPopulation.pickle"
 
 ## Simülasyon ortamı
-env = gym.make("BipedalWalker-v3")
+GYM_ENV_NAME = "BipedalWalker-v3"
+env = gym.make(GYM_ENV_NAME)
 observation_space_dim = env.observation_space.shape[0]
 action_space_dim = env.action_space.shape[0]
+env.close()
 
 # Tekrarlanabilirlik için seed ayarlanır
-# SEED_VALUE = 64
-# random.seed(SEED_VALUE)
-# np.random.seed(SEED_VALUE)
-# env.seed(SEED_VALUE)
+SEED_VALUE = 96
+random.seed(SEED_VALUE)
+np.random.seed(SEED_VALUE)
 
 # Simülasyonu çalıştırmak için ortak fonksiyon
 def run_env(act_fn, n_episode=1, render=False, max_timestep=None):
+	env = gym.make(GYM_ENV_NAME)
+	env.seed(SEED_VALUE)
+
 	# Episode döngüsü
 	totalRewards = 0
 	for episode in range(n_episode):
@@ -40,6 +45,8 @@ def run_env(act_fn, n_episode=1, render=False, max_timestep=None):
 			totalRewards += reward
 			state = next_state
 			timestep += 1
+
+	env.close()
 	return totalRewards
 
 ## Yapay sinir ağı
@@ -87,6 +94,10 @@ def nn_forward(individual, state):
 
 	# Normal dağılımdan sample alarak aksiyonu döndür
 	output = np.random.normal(loc=mu_output[0], scale=sigma_output[0])
+
+	# Aksiyon aralığı [-1, 1]
+	output = np.clip(output, -1, 1)
+
 	return output
 
 ## Hiperparametreler
@@ -97,15 +108,15 @@ n_features = (w1_ndim + w_mu_ndim + w_sigma_ndim + 3)
 n_generation = 5000
 
 # Popülasyon boyutu (birey sayısı)
-n_population = 32
+n_population = 64
 
 # Seleksiyon turnuvasındaki birey sayısı
-selectionTournamentSize = 3
+selectionTournamentSize = int(n_population//2)
 
 # Çaprazlama ve mutasyon olasılıkları
-crossoverProbability = 0.50
-individualMutationProbability = 0.05
-geneMutationProbability = 0.05
+crossoverProbability = 0.66
+individualMutationProbability = 0.10
+geneMutationProbability = 0.10
 
 # Uygunluk ve Birey sınıflarını oluştur
 creator.create("Fitness", base.Fitness, weights=(1.0,))
@@ -124,7 +135,7 @@ def calculateFitness(individual):
 		act_fn=(lambda state: nn_forward(individual, state)),
 		# Her uygunluk hesabında ortamı 1 episode çalıştır
 		n_episode=1,
-		max_timestep=400
+		max_timestep=500
 	)
 	# tuple tipinde çevirmeli
 	return (individualEpisodeRewards, )
@@ -132,8 +143,13 @@ def calculateFitness(individual):
 # Uygunluk fonksiyonunu kaydet
 toolbox.register("evaluate", calculateFitness)
 
+# Bireylerin uygunluk skorunu eşzamanlı ölçebilmek için ThreadPoolExecutor sınıfını toolbox'a register et
+# MAX_OPTIMIZER_THREADS = 4
+# parallel_executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_OPTIMIZER_THREADS)
+# toolbox.register("map", parallel_executor.map)
+
 # Hangi çaprazlama, mutasyon ve seçilim yöntemlerinin kullanılacağını tanımla
-toolbox.register("mate", tools.cxUniform, indpb=0.50)
+toolbox.register("mate", tools.cxTwoPoint)
 toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=geneMutationProbability)
 toolbox.register("select", tools.selTournament, tournsize=selectionTournamentSize)
 
@@ -157,33 +173,66 @@ stats.register("min", np.min, axis=0)
 stats.register("max", np.max, axis=0)
 
 # Simülasyon başlasın!
-finalPopulation, logs = algorithms.eaSimple(
-	population=initialPopulation,
-	toolbox=toolbox,
-	halloffame=hallOfFame,
-	stats=stats,
-	ngen=n_generation,
-	cxpb=crossoverProbability,
-	mutpb=individualMutationProbability,
-	verbose=True
-)
+def run_simulation(pop, ngen=1):
+	return algorithms.eaSimple(
+		population=pop,
+		toolbox=toolbox,
+		halloffame=hallOfFame,
+		stats=stats,
+		ngen=ngen,
+		cxpb=crossoverProbability,
+		mutpb=individualMutationProbability,
+		verbose=False
+	)
+
+def saveProgress():
+	try:
+		# Tüm nesillerin popülasyon geçmişini kaydet
+		pickle.Pickler(open(allGenerationsFinalPopulationOutPath, "wb")).dump(allGenerationsFinalPopulation)
+
+		# Son popülasyonu kaydet
+		pickle.Pickler(open(finalPopulationOutPath, "wb")).dump(population)
+
+		# Simülasyon sonucu ortaya çıkan en iyi bireyi kaydet
+		np.save(modelOutPath, np.array(hallOfFame[0]))
+
+		print("[+] Popülasyon geçmişleri, final popülasyon ve bireyi başarıyla kaydedildi!")
+	except Exception as e:
+		print("[!] Popülasyon geçmişleri, final popülasyon ve bireyi kaydedilemedi {}".format(e))
+
+allGenerationsFinalPopulation = [initialPopulation]
+population = initialPopulation
+try:
+	for currentGeneration in range(n_generation):
+		# 1 nesil çalıştır
+		population, _ = run_simulation(pop=population, ngen=1)
+
+		# Nesil popülasyonunu listeye ekle
+		allGenerationsFinalPopulation.append(population)
+
+		# Uygunluk istatistiklerini al, logla
+		record = stats.compile(population)
+		print(
+			", ".join(
+				["Nesil {}".format(currentGeneration+1)] + ["{0} {1:.2f}".format(k, v) for k,v in record.items()]
+			)
+		)
+		if currentGeneration > 0 and ((currentGeneration % int(n_generation//100)) == 0):
+			saveProgress()
+except KeyboardInterrupt:
+	print("[*] Simülasyon yarıda durduruldu..")
+	saveProgress()
+	exit()
+
+saveProgress()
 
 bestIndividual = hallOfFame[0]
 print("[+] En iyi uygunluk değeri: {}".format(bestIndividual.fitness.values[0]))
 print("Genotip: ", bestIndividual)
 
-# Simülasyon sonucu ortaya çıkan en iyi bireyi kaydet
-try:
-	pickle.Pickler(open(finalPopulationOutPath, "wb")).dump(finalPopulation)
-	np.save(modelOutPath, np.array(bestIndividual))
-	print("[+] Model ve final popülasyonu başarıyla kaydedildi!")
-except Exception as e:
-	print("[!] Model ve final popülasyonu kaydedilemedi: {}".format(e))
-
 # En iyi bireyle simülasyonu çalıştır
 run_env(
 	act_fn=(lambda state: nn_forward(bestIndividual, state)),
-	n_episode=10,
+	n_episode=3,
 	render=True
 )
-env.close()

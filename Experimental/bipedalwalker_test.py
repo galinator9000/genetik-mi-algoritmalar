@@ -40,7 +40,7 @@ def run_env(act_fn, n_episode=1, render=False):
 
 ## Yapay sinir ağı
 # Ara katman ünite sayısı
-nn_hidden_unit = 6
+nn_hidden_unit = 4
 w1_ndim = (observation_space_dim*nn_hidden_unit)
 w_mu_ndim = (nn_hidden_unit*action_space_dim)
 w_sigma_ndim = (nn_hidden_unit*action_space_dim)
@@ -83,6 +83,10 @@ def nn_forward(individual, state):
 
 	# Normal dağılımdan sample alarak aksiyonu döndür
 	output = np.random.normal(loc=mu_output[0], scale=sigma_output[0])
+	
+	# Aksiyon aralığı [-1, 1]
+	output = np.clip(output, -1, 1)
+
 	return output
 
 # En iyi bireyle simülasyonu çalıştır
