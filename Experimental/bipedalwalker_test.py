@@ -2,7 +2,8 @@ import random, gym
 import numpy as np
 from deap import algorithms, base, creator, tools
 
-modelInPath = "models/bipedalWalkerBest"
+trainingSession = 1
+modelInPath = "models/{}/bipedalWalkerBest".format(trainingSession)
 
 # Kaydedilen modeli yükle
 bestIndividual = np.load(modelInPath if modelInPath.endswith(".npy") else (modelInPath+".npy"))
@@ -42,8 +43,7 @@ def run_env(act_fn, n_episode=1, render=False):
 # Ara katman ünite sayısı
 nn_hidden_unit = 4
 w1_ndim = (observation_space_dim*nn_hidden_unit)
-w_mu_ndim = (nn_hidden_unit*action_space_dim)
-w_sigma_ndim = (nn_hidden_unit*action_space_dim)
+w2_ndim = (nn_hidden_unit*action_space_dim)
 
 # Verilen bireyin genotipini yapay sinir ağı parametreleri olarak kullanarak, state vektörünü feed-forward eder
 def nn_forward(individual, state):
@@ -55,15 +55,12 @@ def nn_forward(individual, state):
 	arr = np.array(individual)
 	w1 = arr[:w1_ndim]
 	b1 = arr[w1_ndim]
-	w_mu = arr[w1_ndim+1 : w1_ndim+1+w_mu_ndim]
-	b_mu = arr[w1_ndim+1+w_mu_ndim]
-	w_sigma = arr[w1_ndim+1+w_mu_ndim+1:-1]
-	b_sigma = arr[-1]
+	w2 = arr[w1_ndim+1 : w1_ndim+1+w2_ndim]
+	b2 = arr[-1]
 
 	# Ağırlıkları matris çarpımı için yeniden şekillendir
 	w1 = np.reshape(w1, (observation_space_dim, nn_hidden_unit))
-	w_mu = np.reshape(w_mu, (nn_hidden_unit, action_space_dim))
-	w_sigma = np.reshape(w_sigma, (nn_hidden_unit, action_space_dim))
+	w2 = np.reshape(w2, (nn_hidden_unit, action_space_dim))
 
 	# Sigmoid fonksiyonu
 	sigmoid = lambda x: (1 / (1 + np.exp(-x)))
@@ -77,17 +74,10 @@ def nn_forward(individual, state):
 	# Feed-forward
 	h1 = sigmoid(np.dot(state, w1) + b1)
 
-	# Normal dağılım için Mu & Sigma çıktıları
-	mu_output = tanh(np.dot(h1, w_mu) + b_mu)
-	sigma_output = softplus(np.dot(h1, w_sigma) + b_sigma)
+	# Final çıktı
+	output = tanh(np.dot(h1, w2) + b2)
 
-	# Normal dağılımdan sample alarak aksiyonu döndür
-	output = np.random.normal(loc=mu_output[0], scale=sigma_output[0])
-	
-	# Aksiyon aralığı [-1, 1]
-	output = np.clip(output, -1, 1)
-
-	return output
+	return output[0]
 
 # En iyi bireyle simülasyonu çalıştır
 run_env(

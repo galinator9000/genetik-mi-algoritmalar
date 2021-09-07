@@ -2,11 +2,12 @@ import random, gym, pickle, concurrent.futures
 import numpy as np
 from deap import algorithms, base, creator, tools
 
-modelOutPath = "models/bipedalWalkerBest"
-loadPopulation = True
-initialPopulationInPath = "models/initialPopulation.pickle"
-allGenerationsFinalPopulationOutPath = "models/allGenerationsFinalPopulation.pickle"
-finalPopulationOutPath = "models/finalPopulation.pickle"
+trainingSession = 2
+modelOutPath = "models/{}/bipedalWalkerBest".format(trainingSession)
+loadPopulation = False
+initialPopulationInPath = "models{}//initialPopulation.pickle".format(trainingSession)
+allGenerationsFinalPopulationOutPath = "models/{}/allGenerationsFinalPopulation.pickle".format(trainingSession)
+finalPopulationOutPath = "models/{}/finalPopulation.pickle".format(trainingSession)
 
 ## Simülasyon ortamı
 GYM_ENV_NAME = "BipedalWalker-v3"
@@ -16,7 +17,7 @@ action_space_dim = env.action_space.shape[0]
 env.close()
 
 # Tekrarlanabilirlik için seed ayarlanır
-SEED_VALUE = 96
+SEED_VALUE = 256
 random.seed(SEED_VALUE)
 np.random.seed(SEED_VALUE)
 
@@ -53,8 +54,7 @@ def run_env(act_fn, n_episode=1, render=False, max_timestep=None):
 # Ara katman ünite sayısı
 nn_hidden_unit = 4
 w1_ndim = (observation_space_dim*nn_hidden_unit)
-w_mu_ndim = (nn_hidden_unit*action_space_dim)
-w_sigma_ndim = (nn_hidden_unit*action_space_dim)
+w2_ndim = (nn_hidden_unit*action_space_dim)
 
 # Verilen bireyin genotipini yapay sinir ağı parametreleri olarak kullanarak, state vektörünü feed-forward eder
 def nn_forward(individual, state):
@@ -66,15 +66,12 @@ def nn_forward(individual, state):
 	arr = np.array(individual)
 	w1 = arr[:w1_ndim]
 	b1 = arr[w1_ndim]
-	w_mu = arr[w1_ndim+1 : w1_ndim+1+w_mu_ndim]
-	b_mu = arr[w1_ndim+1+w_mu_ndim]
-	w_sigma = arr[w1_ndim+1+w_mu_ndim+1:-1]
-	b_sigma = arr[-1]
+	w2 = arr[w1_ndim+1 : w1_ndim+1+w2_ndim]
+	b2 = arr[-1]
 
 	# Ağırlıkları matris çarpımı için yeniden şekillendir
 	w1 = np.reshape(w1, (observation_space_dim, nn_hidden_unit))
-	w_mu = np.reshape(w_mu, (nn_hidden_unit, action_space_dim))
-	w_sigma = np.reshape(w_sigma, (nn_hidden_unit, action_space_dim))
+	w2 = np.reshape(w2, (nn_hidden_unit, action_space_dim))
 
 	# Sigmoid fonksiyonu
 	sigmoid = lambda x: (1 / (1 + np.exp(-x)))
@@ -88,21 +85,14 @@ def nn_forward(individual, state):
 	# Feed-forward
 	h1 = sigmoid(np.dot(state, w1) + b1)
 
-	# Normal dağılım için Mu & Sigma çıktıları
-	mu_output = tanh(np.dot(h1, w_mu) + b_mu)
-	sigma_output = softplus(np.dot(h1, w_sigma) + b_sigma)
+	# Final çıktı
+	output = tanh(np.dot(h1, w2) + b2)
 
-	# Normal dağılımdan sample alarak aksiyonu döndür
-	output = np.random.normal(loc=mu_output[0], scale=sigma_output[0])
-
-	# Aksiyon aralığı [-1, 1]
-	output = np.clip(output, -1, 1)
-
-	return output
+	return output[0]
 
 ## Hiperparametreler
 # Her bireyin gen uzunluğu (ağın parametre sayısı)
-n_features = (w1_ndim + w_mu_ndim + w_sigma_ndim + 3)
+n_features = (w1_ndim + w2_ndim + 2)
 
 # Simüle edilecek nesil sayısı
 n_generation = 5000
@@ -114,9 +104,9 @@ n_population = 64
 selectionTournamentSize = int(n_population//2)
 
 # Çaprazlama ve mutasyon olasılıkları
-crossoverProbability = 0.66
-individualMutationProbability = 0.10
-geneMutationProbability = 0.10
+crossoverProbability = 0.33
+individualMutationProbability = 0.25
+geneMutationProbability = 0.25
 
 # Uygunluk ve Birey sınıflarını oluştur
 creator.create("Fitness", base.Fitness, weights=(1.0,))
@@ -124,7 +114,7 @@ creator.create("Individual", list, fitness=creator.Fitness)
 
 # Bireylerin genotiplerini ve popülasyonun basitçe birey listesi olduğunu tanımla
 toolbox = base.Toolbox()
-toolbox.register("attr_weights_n_biases", random.gauss, 0, 1)
+toolbox.register("attr_weights_n_biases", random.gauss, 0, 2)
 toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_weights_n_biases, n_features)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
@@ -135,7 +125,7 @@ def calculateFitness(individual):
 		act_fn=(lambda state: nn_forward(individual, state)),
 		# Her uygunluk hesabında ortamı 1 episode çalıştır
 		n_episode=1,
-		max_timestep=500
+		max_timestep=300
 	)
 	# tuple tipinde çevirmeli
 	return (individualEpisodeRewards, )
@@ -149,8 +139,8 @@ toolbox.register("evaluate", calculateFitness)
 # toolbox.register("map", parallel_executor.map)
 
 # Hangi çaprazlama, mutasyon ve seçilim yöntemlerinin kullanılacağını tanımla
-toolbox.register("mate", tools.cxTwoPoint)
-toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=geneMutationProbability)
+toolbox.register("mate", tools.cxOnePoint)
+toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=2, indpb=geneMutationProbability)
 toolbox.register("select", tools.selTournament, tournsize=selectionTournamentSize)
 
 # Popülasyonu oluştur ya da yükle
